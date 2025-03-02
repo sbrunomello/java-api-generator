@@ -12,7 +12,7 @@
 	<artifactId>java-api-generator</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<name>java-api-generator</name>
-	<description>Tool for automatic generation of APIs in Java​</description>
+	<description>Tool for automatic generation of APIs in Java</description>
 	<url/>
 	<licenses>
 		<license/>
@@ -38,6 +38,13 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-web</artifactId>
 		</dependency>
+
+		<dependency>
+			<groupId>org.springdoc</groupId>
+			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+			<version>2.3.0</version>
+		</dependency>
+
 
 		<dependency>
 			<groupId>org.springframework.boot</groupId>

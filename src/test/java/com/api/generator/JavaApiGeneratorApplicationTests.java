@@ -1,4 +1,4 @@
-package com.devmello.java_api_generator;
+package com.api.generator;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;

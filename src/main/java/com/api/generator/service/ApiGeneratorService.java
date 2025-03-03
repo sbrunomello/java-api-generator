@@ -28,7 +28,6 @@ public class ApiGeneratorService {
         data.put("packageName", packageName);
         data.put("entityName", entityName);
 
-        // Caminho para salvar o arquivo gerado
         File dir = new File("generated/" + packageName.replace(".", "/") + "/controller/");
         if (!dir.exists()) {
             dir.mkdirs();

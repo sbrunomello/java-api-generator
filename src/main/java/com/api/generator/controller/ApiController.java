@@ -1,5 +1,7 @@
 package com.api.generator.controller;
 
+import com.api.generator.model.ApiRequest;
+import com.api.generator.service.AIService;
 import com.api.generator.service.ApiGeneratorService;
 import freemarker.template.TemplateException;
 import io.swagger.v3.oas.annotations.Operation;
@@ -21,10 +23,20 @@ import java.util.zip.ZipEntry;
 @Tag(name = "API Generator", description = "Automatic Java API")
 public class ApiController {
     private final ApiGeneratorService generatorService;
+    private final AIService aiService;
 
-    public ApiController(ApiGeneratorService apiGeneratorService) {
+    public ApiController(ApiGeneratorService apiGeneratorService, AIService aiService) {
         this.generatorService = apiGeneratorService;
+        this.aiService = aiService;
     }
+
+    @PostMapping("/generate-ai")
+    @Operation(summary = "Generates a Java Class based on the informed prompt")
+    public ResponseEntity<String> generateClassWithAI(@RequestParam String prompt, @RequestParam String className) {
+        String generatedCode = aiService.generateCodeFromPrompt(className, prompt);
+        return ResponseEntity.ok(generatedCode);
+    }
+
 
     @PostMapping("/generate")
     @Operation(summary = "Generates a Java Controller based on the informed entity")

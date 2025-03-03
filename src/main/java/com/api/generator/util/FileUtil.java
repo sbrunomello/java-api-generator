@@ -8,7 +8,7 @@ public class FileUtil {
     public static void saveToFile(String filePath, String content) {
         try {
             File file = new File(filePath);
-            file.getParentFile().mkdirs(); // Cria diretórios se não existirem
+            file.getParentFile().mkdirs();
 
             try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file), StandardCharsets.UTF_8))) {
                 writer.write(content);

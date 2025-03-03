@@ -4,12 +4,11 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
-import org.springframework.http.*;
-
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.util.*;
 
 @Service
 public class AIService {
@@ -20,17 +19,14 @@ public class AIService {
     @Value("${ai.api.key}")
     private String apiKey;
 
+    private final HttpClient httpClient = HttpClient.newHttpClient();
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
     public String generateCodeFromPrompt(String className, String prompt) {
         String refinedPrompt = refinePrompt(className, prompt);
         String sanitizedPrompt = sanitizeInput(refinedPrompt);
 
-        RestTemplate restTemplate = new RestTemplate();
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("Authorization", "Bearer " + apiKey);
-        headers.setContentType(MediaType.APPLICATION_JSON);
-
-        ObjectMapper objectMapper = new ObjectMapper();
-        Map<String, String> payload = Collections.singletonMap("inputs", sanitizedPrompt);
+        Map<String, String> payload = Map.of("inputs", sanitizedPrompt);
         String requestBody;
         try {
             requestBody = objectMapper.writeValueAsString(payload);
@@ -38,54 +34,64 @@ public class AIService {
             throw new RuntimeException("Error processing JSON request", e);
         }
 
-        HttpEntity<String> request = new HttpEntity<>(requestBody, headers);
-        ResponseEntity<String> response = restTemplate.exchange(apiUrl, HttpMethod.POST, request, String.class);
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(apiUrl))
+                .header("Authorization", "Bearer " + apiKey)
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                .build();
 
-        if (response.getStatusCode() == HttpStatus.OK) {
-            return extractGeneratedText(response.getBody());
+        try {
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            return response.statusCode() == 200 ? extractGeneratedText(response.body()) : "Error generating code.";
+        } catch (Exception e) {
+            return "Error connecting to AI API: " + e.getMessage();
         }
-        return "Error generating code.";
     }
 
     private String extractGeneratedText(String jsonResponse) {
         try {
-            ObjectMapper objectMapper = new ObjectMapper();
-            List<Map<String, Object>> responseList = objectMapper.readValue(jsonResponse, List.class);
+            List<ResponseData> responseList = objectMapper.readValue(jsonResponse, objectMapper.getTypeFactory()
+                    .constructCollectionType(List.class, ResponseData.class));
 
-            if (!responseList.isEmpty() && responseList.get(0).containsKey("generated_text")) {
-                return responseList.get(0).get("generated_text").toString().trim();
-            }
+            return responseList.stream()
+                    .findFirst()
+                    .map(ResponseData::generated_text)
+                    .map(this::extractJavaCode)
+                    .orElse("Error processing response.");
         } catch (Exception e) {
-            e.printStackTrace();
+            return "Error processing response.";
         }
-        return "Error processing response.";
+    }
+
+    private String extractJavaCode(String response) {
+        int startIndex = response.indexOf("```java");
+        if (startIndex != -1) {
+            response = response.substring(startIndex + 7);
+        }
+
+        int endIndex = response.lastIndexOf("```");
+        if (endIndex != -1) {
+            response = response.substring(0, endIndex);
+        }
+
+        return response.strip();
     }
 
     private String refinePrompt(String className, String prompt) {
-        return "Generate a single complete Java class named '" + className + "' based on the following description:\n"
-                + prompt + "\n\n"
-                + "The class should follow Java best practices and include all necessary imports.\n"
-                + "The output must be a complete Java class, formatted as:\n"
-                + "```java\n"
-                + "public class " + className + " {\n"
-                + "   // Class implementation\n"
-                + "}\n"
-                + "```\n"
-                + "Do not include summaries or explanations, only return the raw class definition.";
+        return STR."""
+               Generate only a single complete Java class named '\{className}' based on the following description:
+               \{prompt}
+
+               Return only the Java code without any explanations, descriptions, comments, or summaries.
+               """;
     }
 
-    public String sanitizeInput(String input) {
-        if (input == null || input.isBlank()) {
-            return "";
-        }
-        StringBuilder sanitized = new StringBuilder();
-        for (char c : input.toCharArray()) {
-            if (c >= 0x00 && c <= 0x1F) {
-                sanitized.append(String.format("\\u%04x", (int) c));
-            } else {
-                sanitized.append(c);
-            }
-        }
-        return sanitized.toString();
+    private String sanitizeInput(String input) {
+        return Optional.ofNullable(input)
+                .map(str -> str.replaceAll("[\\p{Cntrl}&&[^\r\n\t]]", ""))
+                .orElse("");
     }
+
+    private record ResponseData(String generated_text) {}
 }
